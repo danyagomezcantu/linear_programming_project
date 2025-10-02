@@ -23,7 +23,7 @@ Qué hace:
 6) Grafica en 2D los vectores (Aw + y) y (Bw - z) vs. índice (cumple “en 2D”).
 
 Notas:
-- Modelo conforme al enunciado del proyecto de Separación Lineal. (PDF)  # :contentReference[oaicite:5]{index=5}
+- Modelo conforme al enunciado del proyecto de Separación Lineal.
 - Lenguaje simple y comentarios breves para fácil lectura.
 """
 
