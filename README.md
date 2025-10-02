@@ -7,10 +7,10 @@ Se resuelven primal y dual con scipy.optimize.linprog, y se reportan iteraciones
 
 Como primer dataset usamos Breast Cancer Wisconsin (Diagnostic) del UC Irvine ML Repository (569 instancias, 30 variables reales y etiqueta Diagnosis ∈{M,B}). La carga se realiza con ucimlrepo.
 
-### Install the ucimlrepo package 
+Install the ucimlrepo package 
 pip install ucimlrepo
 
-### Import the dataset into your code 
+Import the dataset into your code 
 
 from ucimlrepo import fetch_ucirepo 
   
