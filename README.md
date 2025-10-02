@@ -1,11 +1,20 @@
-# Proyecto de Programación Lineal
+## Proyecto de Programación Lineal MAT-24410
 
-Este proyecto de Programación Lineal implementa Separación Lineal para clasificar dos grupos de observaciones A y B en Rn.
-Partimos del modelo que busca un hiperplano 𝐻(𝑤,𝛽)={𝑥∈𝑅𝑛∣𝑤⊤x=β} que, si es posible, separe ambos conjuntos.
+Danya Carolina Gómez 
 
-Se resuelven primal y dual con scipy.optimize.linprog, y se reportan iteraciones, tiempo de CPU, valor óptimo, verificación KKT y gráficas de Aw+y y Bw−z. 
+Este proyecto de Programación Lineal implementa **Separación Lineal** para clasificar dos grupos de observaciones A y B en R^n. Partimos del modelo que busca un **hiperplano**  
 
-Como primer dataset usamos Breast Cancer Wisconsin (Diagnostic) del UC Irvine ML Repository (569 instancias, 30 variables reales y etiqueta Diagnosis ∈{M,B}). La carga se realiza con ucimlrepo.
+    H(w, β) = { x ∈ R^n | w^T x = β }
+
+que, si es posible, **separe** ambos conjuntos; si no lo es, **minimiza** las violaciones mediante **variables de holgura**.  
+
+Se resuelven **primal** y **dual** con `scipy.optimize.linprog`, y se reportan iteraciones, tiempo de CPU, valor óptimo, verificación KKT y gráficas de:
+
+    A w + y   y   B w - z
+
+Como primer dataset usamos **Breast Cancer Wisconsin (Diagnostic)** del UCI ML Repository (569 instancias, 30 variables reales y etiqueta Diagnosis ∈ {M, B}).  
+
+La carga se realiza con `ucimlrepo` de la siguiente manera:
 
 Install the ucimlrepo package 
 pip install ucimlrepo
