@@ -2,9 +2,9 @@
 
 Danya Carolina Gómez 
 
-Este proyecto de Programación Lineal implementa **Separación Lineal** para clasificar dos grupos de observaciones A y B en R^n. Partimos del modelo que busca un **hiperplano**  
+Este proyecto de Programación Lineal implementa **Separación Lineal** para clasificar dos grupos de observaciones A y B en Rⁿ. Partimos del modelo que busca un **hiperplano**  
 
-    H(w, β) = { x ∈ R^n | w^T x = β }
+    H(w, β) = { x ∈ R<sup>n</sup> | w<sup>T</sup>x = β }
 
 que, si es posible, **separe** ambos conjuntos; si no lo es, **minimiza** las violaciones mediante **variables de holgura**.  
 
