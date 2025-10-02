@@ -12,5 +12,3 @@ print(breast_cancer_wisconsin_diagnostic.metadata)
 
 # variable information
 print(breast_cancer_wisconsin_diagnostic.variables)
-#%%
-print(breast_cancer_wisconsin_diagnostic.data)
