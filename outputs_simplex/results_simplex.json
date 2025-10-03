@@ -3,22 +3,22 @@
   "primal": {
     "success": true,
     "status": "Optimization terminated successfully.",
-    "iterations": 3101,
-    "cpu_seconds": 20.317535700043663,
+    "iterations": 3492,
+    "cpu_seconds": 7.210613300092518,
     "objective": 0.0
   },
   "dual": {
-    "success": false,
-    "status": "The solution is feasible, but the solver did not report that the solution was optimal. Please try a different method.",
-    "iterations": 5000,
-    "cpu_seconds": 26.435117200016975,
-    "objective": -Infinity
+    "success": true,
+    "status": "Optimization terminated successfully.",
+    "iterations": 1313,
+    "cpu_seconds": 2.6982866001781076,
+    "objective": -9.494235553537563e-15
   },
-  "duality_gap_abs": null,
+  "duality_gap_abs": 9.494235553537563e-15,
   "KKT": {
-    "min_slack": -2.255546860396862e-10,
-    "comp_inf": 0.0,
-    "station_inf": 0.0047169811320754715
+    "min_slack": -8.723873179405928e-09,
+    "comp_inf": 4.373658761683289e-24,
+    "station_inf": 0.004716981132076672
   },
   "figures": {
     "Aw_plus_y": "outputs_simplex\\Aw_plus_y_simplex.png",

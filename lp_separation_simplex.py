@@ -81,123 +81,130 @@ def split_A_B(Xs: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
 
 # ------------------------- PROBLEMA PRIMAL -------------------------
 #
-#   Min (e_A/m)^T @ y + (e_B/p)^T @ z
-#   S.a. Aw + y >= e_A*beta + e_A
-#        Bw - z <= e_B*beta - e_B
-#        y >= 0, z >= 0; w y alfa libres
-# Para linprog usaremos la forma canónica (max y <=):
-#   (-A)w + (e_A)beta + I*y + 0*z <= -e_A
-#   ( B)w + (-e_B)beta + 0*y + (-I)z <= -e_B
+#   Min   (e_A/m)^T @ y + (e_B/p)^T @ z
+#   S.a.  Aw + y >= e_A*beta + e_A
+#         Bw - z <= e_B*beta - e_B
+#         y >= 0, z >= 0; w y alfa libres
+#
+# En forma estándar: Sean beta_pos, beta_neg en R^1; w_pos, w_neg en R^n; r en R^m; s en R^p
+
+#   Min     0*beta_pos + 0*beta_neg + 0^T@w_pos + 0^T@w_neg + (e_A/m)^T@y + (e_B/p)^T@z + 0^T@r + 0^T@s
+#   S.a.  - e_A*beta_pos + e_A*beta_neg + A@w_pos - A@w_neg + I_m@y + 0_mxp@z - I_m@r + 0_mxp@s =  e_A
+#         - e_B*beta_pos + e_B*beta_neg + B@w_pos - B@w_neg + 0_pxm@y - I_p@z + 0_pxm@z + I_p@s = -e_B
+#           beta_pos, beta_neg, w_pos, w_neg, y, z, r, s >= 0
 
 
-def build_primal(A: np.ndarray, B: np.ndarray):
+def construir_primal(A: np.ndarray, B: np.ndarray):
     m, n = A.shape
     p = B.shape[0]
 
-    A_block = np.hstack([-A, np.ones((m, 1)), np.eye(m), np.zeros((m, p))])
-    bA = -np.ones(m)
+    M_A = np.hstack(
+        [
+            -np.ones((m, 1)),
+            np.ones((m, 1)),
+            A,
+            -A,
+            np.eye(m),
+            np.zeros((m, p)),
+            -np.eye(m),
+            np.zeros((m, p)),
+        ]
+    )
+    b_A = np.ones(m)
 
-    B_block = np.hstack([B, -np.ones((p, 1)), np.zeros((p, m)), -np.eye(p)])
-    bB = -np.ones(p)
+    M_B = np.hstack(
+        [
+            -np.ones((p, 1)),
+            np.ones((p, 1)),
+            B,
+            -B,
+            np.zeros((p, m)),
+            -np.eye(p),
+            np.zeros((p, m)),
+            np.eye(p),
+        ]
+    )
+    b_B = -np.ones(p)
 
-    A_ub = np.vstack([A_block, B_block])
-    b_ub = np.concatenate([bA, bB])
+    M = np.vstack([M_A, M_B])
+    b = np.concatenate([b_A, b_B])
 
     # c: sólo y, z aparecen en el objetivo
-    N = n + 1 + m + p
+    N = 1 + 1 + n + n + m + p + m + p
     c = np.zeros(N)
-    c[n + 1 : n + 1 + m] = 1.0 / m
-    c[-p:] = 1.0 / p
+    c[2 * (n + 1) : 2 * (n + 1) + m] = 1.0 / m
+    c[2 * (n + 1) + m : 2 * (n + 1) + m + p] = 1.0 / p
 
     # w y beta libres; y,z >= 0
-    bounds = [(-float("inf"), float("inf"))] * (n + 1) + [(0, float("inf"))] * (m + p)
+    bounds = [(0, float("inf"))] * (N)
     sizes = (m, n, p)
-    return c, A_ub, b_ub, bounds, sizes
+    return c, M, b, bounds, sizes
 
 
-def solve_primal_simplex(c, A_ub, b_ub, bounds):
+# ------------------------- PROBLEMA DUAL -------------------------
+#
+# Variables duales: u en R^m, q en R^p
+#
+#   Max   (e_A)^T @ u + (e_B)^T @ q
+#   S.a   (e_A)^T @ u = (e_B)^T @ q
+#         A^T @ u = B^T @ q
+#         0 ≤ u ≤ (e_A)/m
+#         0 ≤ q ≤ (e_B)/p
+#
+# En forma estándar: Sean f en R^m, g en R^p
+#
+#   Min   - (e_A)^T @ u - (e_B)^T @ q + 0^T @ f + 0^T @ g
+#   S.a.    (e_A)^T @ u - (e_B)^T @ q + 0^T @ f + 0^T @ g = 0
+#               A^T @ u - B^T @ q + 0_nxm @ f + 0_nxp @ g = 0
+#               I_m @ u + 0_mxp @ q + I_m @ f + 0_mxp @ g = e_A/m
+#               0_pxm @ u + I_m @ q + 0_pxm @ f + I_m @ g = e_B/p
+#           u, q, f, g >= 0
+
+
+def construir_dual(A: np.ndarray, B: np.ndarray):
+    m, n = A.shape
+    p = B.shape[0]
+
+    e_A = np.ones((m, 1))
+    e_B = np.ones((p, 1))
+
+    M_1 = np.hstack([e_A.T, -e_B.T, np.zeros((1, m + p))])
+    M_2 = np.hstack([A.T, -B.T, np.zeros((n, m + p))])
+    M_3 = np.hstack([np.eye(m), np.zeros((m, p)), np.eye(m), np.zeros((m, p))])
+    M_4 = np.hstack([np.zeros((p, m)), np.eye(p), np.zeros((p, m)), np.eye(p)])
+
+    M = np.vstack([M_1, M_2, M_3, M_4])
+    b = np.concatenate([np.zeros((1 + n, 1)), e_A / m, e_B / p])
+
+    c = np.concatenate([-e_A, -e_B, np.zeros((m + p, 1))])
+
+    # w y beta libres; y,z >= 0
+    bounds = [(0, float("inf"))] * (2 * (m + p))
+    sizes = (m, n, p)
+    return c, M, b, bounds, sizes
+
+
+def simplex_estandar(c, M, b, bounds, iters=5000):
     """
-    Resuelve el primal con simplex clásico de SciPy.
+    Resuelve un problema lineal estandar con simplex clasico de SciPy.
     Devuelve (x_opt, meta, res) donde 'meta' contiene iteraciones, cpu, etc.
     """
     t0 = time.perf_counter()
     res = linprog(
         c,
-        A_ub=A_ub,
-        b_ub=b_ub,
-        bounds=bounds,
+        None,
+        None,
+        M,
+        b,
+        bounds,
         method="simplex",
-        options={"maxiter": 5000},
+        options={"maxiter": iters},
     )
     t1 = time.perf_counter()
     meta = {
         "success": bool(res.success),
         "status": res.message,
         "obj": float(res.fun) if res.success else np.inf,
-        "iters": getattr(res, "nit", None),
-        "cpu": t1 - t0,
-    }
-    return res.x, meta, res
-
-
-# -------------------- DUAL explícito (forma) --------------------
-# Variables duales: u en R^m, q en R^p
-# Máx  (e_A)^T @ u + (e_B)^T @ q    <=>  Min  1^T λ_A + 1^T λ_B  (cambiando el signo)
-# s.a.
-#   0 ≤ u ≤ (e_A)/m,   0 ≤ q ≤ (e_B)/p
-#    -A^T λ_A +  B^T λ_B ≤ 0     (por w_+)
-#    A^T λ_A -  B^T λ_B ≤ 0     (por w_-)
-#    e_A^T λ_A -  e_B^T λ_B ≤ 0 (por beta_+)
-#   -e_A^T λ_A +  e_B^T λ_B ≤ 0 (por beta_-)
-# Nota: en óptimo, e_A^T λ_A = e_B^T λ_B.
-
-
-def build_dual(A: np.ndarray, B: np.ndarray):
-    m, n = A.shape
-    p = B.shape[0]
-    # Restricciones (≤) sobre [λ_A; λ_B]
-    C1 = np.hstack([-A.T, B.T])  # w^+
-    C2 = np.hstack([A.T, -B.T])  # w^-
-    eA = np.ones((m, 1))
-    eB = np.ones((p, 1))
-    C3 = np.hstack([eA.T, -eB.T])  # beta^+
-    C4 = np.hstack([-eA.T, eB.T])  # beta^-
-    A_ub = np.vstack([C1, C2, C3, C4])
-    b_ub = np.zeros(2 * n + 2)
-
-    # Objetivo de minimización (para usar linprog):
-    # min 1^T λ_A + 1^T λ_B  y luego negamos para reportar la forma "max -sum λ"
-    c = np.concatenate([np.ones(m), np.ones(p)])
-
-    # Bounds: 0 ≤ λ_A ≤ 1/m,  0 ≤ λ_B ≤ 1/p
-    bounds = [(0, 1.0 / m)] * m + [(0, 1.0 / p)] * p
-    return c, A_ub, b_ub, bounds
-
-
-def solve_dual_simplex(A: np.ndarray, B: np.ndarray):
-    """
-    Resuelve el dual explícito con simplex (min versión) y devuelve:
-      - lbd_opt: lambdas óptimas concatenadas [λ_A; λ_B]
-      - meta_dual: dict con éxito, iters, cpu y obj_dual (en forma "max")
-      - res: objeto de SciPy
-    """
-    c, A_ub, b_ub, bounds = build_dual(A, B)
-    t0 = time.perf_counter()
-    res = linprog(
-        c,
-        A_ub=A_ub,
-        b_ub=b_ub,
-        bounds=bounds,
-        method="simplex",
-        options={"maxiter": 5000},
-    )
-    t1 = time.perf_counter()
-    # pasamos de "min sum λ" a "max -sum λ"
-    obj_dual = float(-(res.fun)) if res.success else -np.inf
-    meta = {
-        "success": bool(res.success),
-        "status": res.message,
-        "obj_dual": obj_dual,
         "iters": getattr(res, "nit", None),
         "cpu": t1 - t0,
     }
@@ -260,7 +267,7 @@ def plot_Bw_minus_z(B: np.ndarray, w: np.ndarray, z: np.ndarray, path_png: str) 
 # -------------------- experimento principal (lo que te regresa) --------------------
 
 
-def run_simplex_experiment(outdir: str = "outputs_simplex") -> Dict[str, Any]:
+def calcular_hiperplano(outdir: str = "outputs_simplex") -> Dict[str, Any]:
     """
     Ejecuta TODO con SIMPLEX (primal y dual) y REGRESA un dict con:
       - iteraciones, cpu y objetivo (primal y dual)
@@ -274,55 +281,63 @@ def run_simplex_experiment(outdir: str = "outputs_simplex") -> Dict[str, Any]:
 
     # 1) Datos
     X, y = load_breast_cancer()
-    Xs = standardize(X)
-    A, B = split_A_B(Xs, y)
+    #   Xs = standardize(X)
+    #   A, B = split_A_B(Xs, y)
+    A, B = split_A_B(X, y)
 
     # 2) PRIMAL
-    c, A_ub, b_ub, bounds, sizes = build_primal(A, B)
-    x_opt, meta_p, res_p = solve_primal_simplex(c, A_ub, b_ub, bounds)
+    c_prim, M_prim, b_prim, bounds_prim, sizes_prim = construir_primal(A, B)
+    opt_prim, meta_prim, res_prim = simplex_estandar(
+        c_prim, M_prim, b_prim, bounds_prim
+    )
 
-    # Particiona solución para graficar
-    m, n, p = sizes
-    w = x_opt[:n]
-    beta = x_opt[n]
-    y_slack = x_opt[n + 1 : n + 1 + m]
-    z_slack = x_opt[-p:]
+    # Solución del hiperplano
+    m, n, p = sizes_prim
+    beta = opt_prim[0] - opt_prim[1]
+    w = opt_prim[2 : 2 + n] - opt_prim[2 + n : 2 + 2 * n]
+    y = opt_prim[2 + 2 * n : 2 + 2 * n + m]
+    z = opt_prim[2 + 2 * n + m : 2 + 2 * n + m + p]
 
-    # 3) DUAL (explícito)
-    lam_opt, meta_d, res_d = solve_dual_simplex(A, B)
+    # 3) DUAL
+    c_dual, M_dual, b_dual, bounds_dual, sizes_dual = construir_dual(A, B)
+    opt_dual, meta_dual, res_dual = simplex_estandar(
+        c_dual, M_dual, b_dual, bounds_dual
+    )
+
+    print("Primal: ")
 
     # 4) KKT (usando los lambdas del dual explícito)
-    kkt = kkt_from_primal_dual(c, A_ub, b_ub, x_opt, lam_opt)
+    kkt = kkt_from_primal_dual(c_prim, M_prim, b_prim, opt_prim, opt_dual[0 : m + p])
 
     # 5) Brecha de dualidad
     gap = (
-        abs(meta_p["obj"] - meta_d["obj_dual"])
-        if (meta_p["success"] and meta_d["success"])
+        abs(meta_prim["obj"] - meta_dual["obj"])
+        if (meta_prim["success"] and meta_dual["success"])
         else None
     )
 
     # 6) Gráficas pedidas
     fig1 = os.path.join(outdir, "Aw_plus_y_simplex.png")
     fig2 = os.path.join(outdir, "Bw_minus_z_simplex.png")
-    plot_Aw_plus_y(A, w, y_slack, fig1)
-    plot_Bw_minus_z(B, w, z_slack, fig2)
+    plot_Aw_plus_y(A, w, y, fig1)
+    plot_Bw_minus_z(B, w, z, fig2)
 
     # 7) Empaquetado de resultados
     results = {
         "solver": "simplex",
         "primal": {
-            "success": meta_p["success"],
-            "status": meta_p["status"],
-            "iterations": meta_p["iters"],
-            "cpu_seconds": meta_p["cpu"],
-            "objective": meta_p["obj"],
+            "success": meta_prim["success"],
+            "status": meta_prim["status"],
+            "iterations": meta_prim["iters"],
+            "cpu_seconds": meta_prim["cpu"],
+            "objective": meta_prim["obj"],
         },
         "dual": {
-            "success": meta_d["success"],
-            "status": meta_d["status"],
-            "iterations": meta_d["iters"],
-            "cpu_seconds": meta_d["cpu"],
-            "objective": meta_d["obj_dual"],
+            "success": meta_dual["success"],
+            "status": meta_dual["status"],
+            "iterations": meta_dual["iters"],
+            "cpu_seconds": meta_dual["cpu"],
+            "objective": meta_dual["obj"],
         },
         "duality_gap_abs": gap,
         "KKT": kkt,
@@ -338,7 +353,7 @@ def run_simplex_experiment(outdir: str = "outputs_simplex") -> Dict[str, Any]:
 # -------------------- CLI simple --------------------
 
 if __name__ == "__main__":
-    out = run_simplex_experiment()
+    out = calcular_hiperplano()
     # Impresión breve y clara
     print("\n=== SIMPLEX — Resumen ===")
     print(
