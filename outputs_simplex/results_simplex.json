@@ -1,22 +1,22 @@
 {
   "solver": "simplex",
   "primal": {
-    "success": false,
-    "status": "Phase 1 of the simplex method failed to find a feasible solution. The pseudo-objective function evaluates to 6.5e+01 which exceeds the required tolerance of 1e-09 for a solution to be considered 'close enough' to zero to be a basic solution. Consider increasing the tolerance to be greater than 6.5e+01. If this tolerance is unacceptably large the problem may be infeasible.",
-    "iterations": 1000,
-    "cpu_seconds": 7.890106299979379,
-    "objective": Infinity
+    "success": true,
+    "status": "Optimization terminated successfully.",
+    "iterations": 3101,
+    "cpu_seconds": 20.317535700043663,
+    "objective": 0.0
   },
   "dual": {
     "success": false,
     "status": "The solution is feasible, but the solver did not report that the solution was optimal. Please try a different method.",
-    "iterations": 1000,
-    "cpu_seconds": 10.418669700011378,
+    "iterations": 5000,
+    "cpu_seconds": 26.435117200016975,
     "objective": -Infinity
   },
   "duality_gap_abs": null,
   "KKT": {
-    "min_slack": -2.7254538951484406,
+    "min_slack": -2.255546860396862e-10,
     "comp_inf": 0.0,
     "station_inf": 0.0047169811320754715
   },
