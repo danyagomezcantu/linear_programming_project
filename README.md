@@ -6,7 +6,7 @@
 
 Este proyecto de Programación Lineal implementa **Separación Lineal** para clasificar dos grupos de observaciones A y B en Rⁿ. Partimos del modelo que busca un **hiperplano**  
 
-    H(w, β) = { x ∈ Rⁿ | wTx = β }
+    H(w, β) = { x ∈ Rⁿ | wᵀx = β }
 
 que, si es posible, **separe** ambos conjuntos; si no lo es, **minimiza** las violaciones mediante **variables de holgura**.  
 
