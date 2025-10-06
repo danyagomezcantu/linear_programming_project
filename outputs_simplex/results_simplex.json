@@ -1,32 +1,37 @@
 {
   "solver": "simplex",
+  "sizes": {
+    "m": 212,
+    "p": 357,
+    "n": 30
+  },
   "primal": {
     "success": true,
     "status": "Optimization terminated successfully.",
-    "iterations": 3492,
-    "cpu_seconds": 7.210613300092518,
+    "iterations": 3454,
+    "cpu_seconds": 37.07591549993958,
     "objective": 0.0
   },
   "dual": {
     "success": true,
     "status": "Optimization terminated successfully.",
-    "iterations": 1313,
-    "cpu_seconds": 2.6982866001781076,
-    "objective": -9.494235553537563e-15
+    "iterations": 1768,
+    "cpu_seconds": 19.033104400034063,
+    "objective_max_form": -1.6034304069901922e-13
   },
-  "duality_gap_abs": 9.494235553537563e-15,
+  "duality_gap_abs": 1.6034304069901922e-13,
   "KKT": {
-    "min_slack": -8.723873179405928e-09,
-    "comp_inf": 4.373658761683289e-24,
-    "station_inf": 0.004716981132076672
+    "min_slack": -1.6649437384330668e-10,
+    "comp_inf": 3.584524298329443e-13,
+    "station_inf": 0.0047169811320754715
   },
   "figures": {
     "Aw_plus_y": "outputs_simplex\\Aw_plus_y_simplex.png",
-    "Bw_minus_z": "outputs_simplex\\Bw_minus_z_simplex.png"
+    "Bw_minus_z": "outputs_simplex\\Bw_minus_z_simplex.png",
+    "pca_2d": "outputs_simplex\\pca_hyperplane_simplex.png"
   },
-  "sizes": {
-    "m": 212,
-    "p": 357,
-    "n": 30
+  "hyperplane": {
+    "beta": -137.13022555881554,
+    "w_norm": 1654.0694169261558
   }
 }
