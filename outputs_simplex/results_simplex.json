@@ -9,14 +9,14 @@
     "success": true,
     "status": "Optimization terminated successfully.",
     "iterations": 3454,
-    "cpu_seconds": 37.07591549993958,
+    "cpu_seconds": 27.306384399998933,
     "objective": 0.0
   },
   "dual": {
     "success": true,
     "status": "Optimization terminated successfully.",
     "iterations": 1768,
-    "cpu_seconds": 19.033104400034063,
+    "cpu_seconds": 12.795467199990526,
     "objective_max_form": -1.6034304069901922e-13
   },
   "duality_gap_abs": 1.6034304069901922e-13,
