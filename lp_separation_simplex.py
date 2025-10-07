@@ -30,7 +30,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import linprog
 from ucimlrepo import fetch_ucirepo
-
+from sklearn.decomposition import PCA
 
 # -------------------- utilidades sencillas --------------------
 
@@ -58,16 +58,6 @@ def load_breast_cancer() -> Tuple[pd.DataFrame, pd.Series]:
     X = data.data.features.copy()
     y = data.data.targets["Diagnosis"].copy()
     return X, y
-
-
-def standardize(X: pd.DataFrame) -> pd.DataFrame:
-    """
-    Estandariza cada columna a media 0 y varianza 1.
-    Esto ayuda a la estabilidad numérica del PL.
-    """
-    mu = X.mean(0)
-    sigma = X.std(0).replace(0, 1.0)
-    return (X - mu) / sigma
 
 
 def split_A_B(Xs: pd.DataFrame, y: pd.Series) -> Tuple[np.ndarray, np.ndarray]:
@@ -186,7 +176,7 @@ def construir_dual(A: np.ndarray, B: np.ndarray):
 
 def simplex_estandar(c, M, b, bounds, iters=5000):
     """
-    Resuelve un problema lineal estandar con simplex clasico de SciPy.
+    Resuelve un problema lineal estándar con simplex clásico de SciPy.
     Devuelve (x_opt, meta, res) donde 'meta' contiene iteraciones, cpu, etc.
     """
     t0 = time.perf_counter()
@@ -202,43 +192,55 @@ def simplex_estandar(c, M, b, bounds, iters=5000):
     )
     t1 = time.perf_counter()
     meta = {
-        "success": bool(res.success),
-        "status": res.message,
+        "exito": bool(res.success),
+        "msg": res.message,
         "obj": float(res.fun) if res.success else np.inf,
         "iters": getattr(res, "nit", None),
-        "cpu": t1 - t0,
+        "tiempo": t1 - t0,
     }
     return res.x, meta, res
 
 
-# -------------------- KKT (con lambdas del DUAL explícito) --------------------
+# -------------------- KARUSH - KUHN - TUCKER --------------------
 
 
-def kkt_from_primal_dual(
+def verificar_kkt(
     c: np.ndarray,
-    A_ub: np.ndarray,
-    b_ub: np.ndarray,
+    A: np.ndarray,
+    b: np.ndarray,
     x_opt: np.ndarray,
-    lam_opt: np.ndarray,
+    y_opt: np.ndarray,
 ) -> dict:
     """
-    KKT prácticos:
-      - Factibilidad primal: A_ub x <= b_ub  (medimos min slack)
-      - λ >= 0 (lo asegura el dual por bounds)
-      - Complementariedad: λ_i * slack_i ~ 0
-      - Estacionariedad: || c + A_ub^T λ ||_inf ~ 0
+    Condiciones de Karush-Kuhn-Tucker:
+      1.- x.T@z ~ 0         (complementariedad)
+      2.- A@x-b ~ 0         (factibilidad primal)
+      3.- A.T@y+z-c ~ 0     (estacionariedad)
+      4.- x, z >= 0         (no negatividad)
     """
-    slack = b_ub - A_ub @ x_opt
-    min_slack = float(slack.min())
-    comp_inf = float(np.max(np.abs(lam_opt * slack)))
-    station_inf = float(np.max(np.abs(c + A_ub.T @ lam_opt)))
-    return {"min_slack": min_slack, "comp_inf": comp_inf, "station_inf": station_inf}
+    ATy = A.T @ y_opt
+    z = c - ATy
+    kkt1 = x_opt.T @ z
+    kkt2 = float(np.max(A @ x_opt - b))
+    kkt3 = float(np.max(ATy + z - c))
+    kkt4_1 = np.min(x_opt)
+    kkt4_2 = np.min(z)
+
+    return {
+        "complementariedad": kkt1,
+        "factibilidad_primal": kkt2,
+        "estacionariedad": kkt3,
+        "no_negatividad_primal": kkt4_1,
+        "no_negatividad_holgura_dual": kkt4_2,
+    }
 
 
 # -------------------- gráficas pedidas --------------------
 
 
-def plot_Aw_plus_y(A: np.ndarray, w: np.ndarray, y: np.ndarray, path_png: str) -> None:
+def plot_Aw_plus_y(
+    A: np.ndarray, w: np.ndarray, y: np.ndarray, path_png: str
+) -> None:
     vals = A @ w + y
     plt.figure()
     plt.title("Aw + y")
@@ -251,7 +253,9 @@ def plot_Aw_plus_y(A: np.ndarray, w: np.ndarray, y: np.ndarray, path_png: str) -
     plt.close()
 
 
-def plot_Bw_minus_z(B: np.ndarray, w: np.ndarray, z: np.ndarray, path_png: str) -> None:
+def plot_Bw_minus_z(
+    B: np.ndarray, w: np.ndarray, z: np.ndarray, path_png: str
+) -> None:
     vals = B @ w - z
     plt.figure()
     plt.title("Bw - z")
@@ -264,26 +268,70 @@ def plot_Bw_minus_z(B: np.ndarray, w: np.ndarray, z: np.ndarray, path_png: str) 
     plt.close()
 
 
-# -------------------- experimento principal (lo que te regresa) --------------------
-
-
-def calcular_hiperplano(outdir: str = "outputs_simplex") -> Dict[str, Any]:
+def plot_pca_hyperplane(X_df: pd.DataFrame, y_labels, w: np.ndarray, beta: float, path_png: str):
     """
-    Ejecuta TODO con SIMPLEX (primal y dual) y REGRESA un dict con:
+    PCA 2D sobre datos ESTANDARIZADOS (z-score) y recta del hiperplano proyectada.
+    El PL pudo haberse resuelto en el espacio original; aquí convertimos (w,beta)
+    al sistema estandarizado antes de proyectar.
+    """
+
+    # 1) Estandarizar columnas (z-score) SOLO para la visualización
+    X = X_df.to_numpy(dtype=float)
+    mu = X.mean(axis=0)
+    sigma = X.std(axis=0)
+    sigma[sigma == 0.0] = 1.0
+    Z = (X - mu) / sigma  # n_samples x n_features
+
+    # 2) PCA en el espacio estandarizado
+    pca = PCA(n_components=2, random_state=0)
+    Z2 = pca.fit_transform(Z)            # n_samples x 2
+
+    # 3) Convertir hiperplano (w,beta) al sistema estandarizado
+    w_std = sigma * w                    # elemento a elemento
+    beta_std = beta - float(mu @ w)
+
+    # 4) Proyectar el hiperplano a 2D (PC1, PC2)
+    w2 = pca.components_ @ w_std         # 2-vector
+    x1 = np.linspace(Z2[:, 0].min(), Z2[:, 0].max(), 400)
+    xline = None if abs(w2[1]) < 1e-12 else (beta_std - w2[0] * x1) / w2[1]
+
+    # 5) Dispersión con etiquetas (acepta Series o ndarray)
+    y_arr = np.asarray(y_labels)
+    maskM = (y_arr == "M")
+
+    plt.figure()
+    plt.scatter(Z2[~maskM, 0], Z2[~maskM, 1], s=14, label="B")
+    plt.scatter(Z2[ maskM, 0], Z2[ maskM, 1], s=14, label="M")
+    if xline is None:
+        x0 = beta_std / (w2[0] if abs(w2[0]) > 1e-12 else 1.0)
+        plt.axvline(x=x0, linestyle="--", label="Hiperplano (aprox)")
+    else:
+        plt.plot(x1, xline, "--", label="Hiperplano (aprox)")
+    plt.title("PCA 2D con hiperplano proyectado")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path_png)
+    plt.close()
+
+
+# -------------------- OBTENCIÓN DEL HIPERPLANO --------------------
+
+
+def calcular_hiperplano(outdir: str = "outputs_simplex"):
+    """
+    Ejecuta el problema con SIMPLEX (primal y dual) y regresa un dict con:
       - iteraciones, cpu y objetivo (primal y dual)
       - brecha de dualidad
-      - métricas KKT (min_slack, comp_inf, station_inf)
+      - métricas KKT
       - rutas de las figuras Aw+y y Bw-z
 
-    También guarda 'results_simplex.json' y las imágenes en 'outdir'.
+    Guarda 'results_simplex.json' y las imágenes en 'outputs_simplex'.
     """
     ensure_dir(outdir)
 
     # 1) Datos
-    X, y = load_breast_cancer()
-    #   Xs = standardize(X)
-    #   A, B = split_A_B(Xs, y)
-    A, B = split_A_B(X, y)
+    X, y_labels = load_breast_cancer()
+    A, B = split_A_B(X, y_labels)
 
     # 2) PRIMAL
     c_prim, M_prim, b_prim, bounds_prim, sizes_prim = construir_primal(A, B)
@@ -294,9 +342,9 @@ def calcular_hiperplano(outdir: str = "outputs_simplex") -> Dict[str, Any]:
     # Solución del hiperplano
     m, n, p = sizes_prim
     beta = opt_prim[0] - opt_prim[1]
-    w = opt_prim[2 : 2 + n] - opt_prim[2 + n : 2 + 2 * n]
-    y = opt_prim[2 + 2 * n : 2 + 2 * n + m]
-    z = opt_prim[2 + 2 * n + m : 2 + 2 * n + m + p]
+    w = opt_prim[2: 2 + n] - opt_prim[2 + n: 2 + 2 * n]
+    y_sl = opt_prim[2 + 2 * n: 2 + 2 * n + m]  # <- antes 'y'
+    z_sl = opt_prim[2 + 2 * n + m: 2 + 2 * n + m + p]  # <- antes 'z'
 
     # 3) DUAL
     c_dual, M_dual, b_dual, bounds_dual, sizes_dual = construir_dual(A, B)
@@ -304,68 +352,50 @@ def calcular_hiperplano(outdir: str = "outputs_simplex") -> Dict[str, Any]:
         c_dual, M_dual, b_dual, bounds_dual
     )
 
-    print("Primal: ")
-
     # 4) KKT (usando los lambdas del dual explícito)
-    kkt = kkt_from_primal_dual(c_prim, M_prim, b_prim, opt_prim, opt_dual[0 : m + p])
+    y_opt = np.hstack((opt_dual[:m], -opt_dual[m : m + p]))
+    kkt = verificar_kkt(c_prim, M_prim, b_prim, opt_prim, y_opt)
 
     # 5) Brecha de dualidad
     gap = (
         abs(meta_prim["obj"] - meta_dual["obj"])
-        if (meta_prim["success"] and meta_dual["success"])
+        if (meta_prim["exito"] and meta_dual["exito"])
         else None
     )
-
     # 6) Gráficas pedidas
     fig1 = os.path.join(outdir, "Aw_plus_y_simplex.png")
     fig2 = os.path.join(outdir, "Bw_minus_z_simplex.png")
-    plot_Aw_plus_y(A, w, y, fig1)
-    plot_Bw_minus_z(B, w, z, fig2)
+    fig3 = os.path.join(outdir, "pca_hyperplane_simplex.png")
+
+    plot_Aw_plus_y(A, w, y_sl, fig1)  # usar y_sl (holguras de A)
+    plot_Bw_minus_z(B, w, z_sl, fig2)  # usar z_sl (holguras de B)
+    plot_pca_hyperplane(X, y_labels, w, beta, fig3)  # pasar etiquetas reales
 
     # 7) Empaquetado de resultados
-    results = {
-        "solver": "simplex",
-        "primal": {
-            "success": meta_prim["success"],
-            "status": meta_prim["status"],
-            "iterations": meta_prim["iters"],
-            "cpu_seconds": meta_prim["cpu"],
-            "objective": meta_prim["obj"],
-        },
-        "dual": {
-            "success": meta_dual["success"],
-            "status": meta_dual["status"],
-            "iterations": meta_dual["iters"],
-            "cpu_seconds": meta_dual["cpu"],
-            "objective": meta_dual["obj"],
-        },
-        "duality_gap_abs": gap,
-        "KKT": kkt,
-        "figures": {"Aw_plus_y": fig1, "Bw_minus_z": fig2},
-        "sizes": {"m": int(m), "p": int(p), "n": int(n)},
-    }
+    results = (meta_prim, meta_dual, gap, kkt, fig1, fig2, fig3)
 
     # 8) Guardar JSON
     save_json(os.path.join(outdir, "results_simplex.json"), results)
     return results
 
 
-# -------------------- CLI simple --------------------
+# -------------------- Ejecución --------------------
 
 if __name__ == "__main__":
-    out = calcular_hiperplano()
-    # Impresión breve y clara
-    print("\n=== SIMPLEX — Resumen ===")
-    print(
-        f"PRIMAL:  iters={out['primal']['iterations']}, cpu={out['primal']['cpu_seconds']:.6f}s, obj={out['primal']['objective']:.6f}, success={out['primal']['success']}"
-    )
-    print(
-        f"DUAL:    iters={out['dual']['iterations']}, cpu={out['dual']['cpu_seconds']:.6f}s, obj={out['dual']['objective']:.6f}, success={out['dual']['success']}"
-    )
-    print(f"Gap |primal - dual| = {out['duality_gap_abs']}")
-    print(
-        f"KKT: min_slack={out['KKT']['min_slack']:.3e}, ||λ∘slack||_inf={out['KKT']['comp_inf']:.3e}, ||c + A^T λ||_inf={out['KKT']['station_inf']:.3e}"
-    )
+    meta_prim, meta_dual, gap, kkt, fig1, fig2, fig3 = calcular_hiperplano()
+    # Impresión de resultados
+    print("\n===== SIMPLEX — Resumen =====")
+    print("\nEjecución del primal")
+    for x, y in meta_prim.items():
+        print(x, y)
+    print("\nEjecución del dual")
+    for x, y in meta_dual.items():
+        print(x, y)
+    print(f"\nBrecha entre primal y dual = {gap}")
+    print("\nSatisfacción de condiciones Karush-Kuhn-Tucker")
+    for x, y in kkt.items():
+        print(x, y)
     print("Figuras guardadas:")
-    print(" -", out["figures"]["Aw_plus_y"])
-    print(" -", out["figures"]["Bw_minus_z"])
+    print(" -", fig1)
+    print(" -", fig2)
+    print(" -", fig3)
