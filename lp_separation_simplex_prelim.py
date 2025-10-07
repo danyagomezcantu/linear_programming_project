@@ -30,6 +30,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import linprog
 from ucimlrepo import fetch_ucirepo
+from sklearn.decomposition import PCA
 
 
 # -------------------- utilidades sencillas --------------------
@@ -268,6 +269,39 @@ def graficar_Bw_menos_z(
     plt.close()
 
 
+def plot_pca_hyperplane(
+    Xs: pd.DataFrame, y: pd.Series, w: np.ndarray, beta: float, path_png: str
+):
+    """
+    PCA a 2D (PC1, PC2) y recta del hiperplano proyectada. Es ilustrativa.
+    """
+    pca = PCA(n_components=2, random_state=0)
+    X2 = pca.fit_transform(Xs.to_numpy())
+    w2 = pca.components_ @ w  # proyección de w
+
+    x1 = np.linspace(X2[:, 0].min(), X2[:, 0].max(), 400)
+    if abs(w2[1]) < 1e-10:
+        xline = None
+    else:
+        xline = (beta - w2[0] * x1) / w2[1]
+
+    plt.figure()
+    maskM = y.values == "M"
+    plt.scatter(X2[~maskM, 0], X2[~maskM, 1], s=14, label="B")
+    plt.scatter(X2[maskM, 0], X2[maskM, 1], s=14, label="M")
+    if xline is None:
+        # Vertical aprox (w2[1]≈0)
+        x0 = beta / (w2[0] if abs(w2[0]) > 1e-12 else 1.0)
+        plt.axvline(x=x0, linestyle="--", label="Hiperplano (aprox)")
+    else:
+        plt.plot(x1, xline, "--", label="Hiperplano (aprox)")
+    plt.title("PCA 2D con hiperplano proyectado")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path_png)
+    plt.close()
+
+
 # -------------------- OBTENCIÓN DEL HIPERPLANO --------------------
 
 
@@ -318,15 +352,16 @@ def calcular_hiperplano(outdir: str = "outputs_simplex"):
         if (meta_prim["exito"] and meta_dual["exito"])
         else None
     )
-
     # 6) Gráficas pedidas
     fig1 = os.path.join(outdir, "Aw_plus_y_simplex.png")
     fig2 = os.path.join(outdir, "Bw_minus_z_simplex.png")
+    fig3 = os.path.join(outdir, "pca_hyperplane_simplex.png")
     graficar_Aw_mas_y(A, w, y, fig1)
     graficar_Bw_menos_z(B, w, z, fig2)
+    plot_pca_hyperplane(X, y, w, beta, fig3)
 
     # 7) Empaquetado de resultados
-    results = (meta_prim, meta_dual, gap, kkt, fig1, fig2)
+    results = (meta_prim, meta_dual, gap, kkt, fig1, fig2, fig3)
 
     # 8) Guardar JSON
     save_json(os.path.join(outdir, "results_simplex.json"), results)
@@ -337,7 +372,7 @@ def calcular_hiperplano(outdir: str = "outputs_simplex"):
 # -------------------- Ejecución --------------------
 
 if __name__ == "__main__":
-    meta_prim, meta_dual, gap, kkt, fig1, fig2 = calcular_hiperplano()
+    meta_prim, meta_dual, gap, kkt, fig1, fig2, fig3 = calcular_hiperplano()
     # Impresión de resultados
     print("\n===== SIMPLEX — Resumen =====")
     print("\nEjecución del primal")
@@ -353,3 +388,4 @@ if __name__ == "__main__":
     print("Figuras guardadas:")
     print(" -", fig1)
     print(" -", fig2)
+    print(" -", fig3)
