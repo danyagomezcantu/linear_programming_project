@@ -125,9 +125,3 @@ Esto imprimirá un resumen en consola y generará las figuras y el archivo de re
 
 El modelo de separación lineal desarrollado resolvió de manera exacta la separación de los conjuntos maligno y benigno, con resultados numéricamente óptimos y comprobación analítica completa.  
 La incorporación de **PCA** permitió visualizar la frontera lineal en dos dimensiones, demostrando la aplicabilidad práctica de la programación lineal para problemas de clasificación y separación.
-
----
-*Instituto Tecnológico Autónomo de México*
-**Curso:** Programación Lineal (MAT-24410)
-**Periodo:** Otoño 2025  
-**Lenguaje:** Python 3.10  
