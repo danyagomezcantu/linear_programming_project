@@ -1,24 +1,21 @@
 """
 lp_separation_simplex.py
 
-Separación lineal por Programación Lineal (PL) usando EXCLUSIVAMENTE
-linprog(method="simplex") para:
-  (a) PRIMAL (con holguras)
-  (b) DUAL explícito (variables lambda)
+Problema de Separación Lineal (tanto primal como dual) usando simplex de scipy.linprog
 
 El script:
-- Carga Breast Cancer (UCI) y estandariza.
+- Carga los datos de Breast Cancer (UCI).
 - Construye y resuelve PRIMAL y DUAL con SIMPLEX.
-- Calcula y DEVUELVE métricas pedidas:
-    * iteraciones (primal/dual)
-    * tiempo de CPU (primal/dual)
-    * valor óptimo (primal y dual) y brecha |primal - dual|
-    * validación KKT (min slack, complementariedad, estacionariedad)
-- Genera y guarda las gráficas solicitadas: Aw + y y Bw - z.
-- Regresa un dict con todo (rutas de imágenes incluidas).
+- Calcula las siguientes métricas para el primal y el dual:
+    * iteraciones
+    * tiempo de CPU
+    * valor óptimo y brecha |solucion_primal - solucion_dual|
+    * validación de cada condición de Karush-Kuhn-Tucker
+- Genera y guarda las gráficas solicitadas: Aw + y, Bw - z, hiperplano.
+- Regresa un diccionario con todos los resultados (rutas de imágenes incluidas).
 
 Modelo conforme al enunciado del proyecto (margen normalizado a 1,
-variables de holgura, y graficación de Aw+y y Bw-z).
+variables de holgura, y graficaciones).
 """
 
 from __future__ import annotations
@@ -238,9 +235,7 @@ def verificar_kkt(
 # -------------------- gráficas pedidas --------------------
 
 
-def plot_Aw_plus_y(
-    A: np.ndarray, w: np.ndarray, y: np.ndarray, path_png: str
-) -> None:
+def plot_Aw_plus_y(A: np.ndarray, w: np.ndarray, y: np.ndarray, path_png: str) -> None:
     vals = A @ w + y
     plt.figure()
     plt.title("Aw + y")
@@ -253,9 +248,7 @@ def plot_Aw_plus_y(
     plt.close()
 
 
-def plot_Bw_minus_z(
-    B: np.ndarray, w: np.ndarray, z: np.ndarray, path_png: str
-) -> None:
+def plot_Bw_minus_z(B: np.ndarray, w: np.ndarray, z: np.ndarray, path_png: str) -> None:
     vals = B @ w - z
     plt.figure()
     plt.title("Bw - z")
@@ -268,7 +261,9 @@ def plot_Bw_minus_z(
     plt.close()
 
 
-def plot_pca_hyperplane(X_df: pd.DataFrame, y_labels, w: np.ndarray, beta: float, path_png: str):
+def plot_pca_hyperplane(
+    X_df: pd.DataFrame, y_labels, w: np.ndarray, beta: float, path_png: str
+):
     """
     PCA 2D sobre datos ESTANDARIZADOS (z-score) y recta del hiperplano proyectada.
     El PL pudo haberse resuelto en el espacio original; aquí convertimos (w,beta)
@@ -284,24 +279,24 @@ def plot_pca_hyperplane(X_df: pd.DataFrame, y_labels, w: np.ndarray, beta: float
 
     # 2) PCA en el espacio estandarizado
     pca = PCA(n_components=2, random_state=0)
-    Z2 = pca.fit_transform(Z)            # n_samples x 2
+    Z2 = pca.fit_transform(Z)  # n_samples x 2
 
     # 3) Convertir hiperplano (w,beta) al sistema estandarizado
-    w_std = sigma * w                    # elemento a elemento
+    w_std = sigma * w  # elemento a elemento
     beta_std = beta - float(mu @ w)
 
     # 4) Proyectar el hiperplano a 2D (PC1, PC2)
-    w2 = pca.components_ @ w_std         # 2-vector
+    w2 = pca.components_ @ w_std  # 2-vector
     x1 = np.linspace(Z2[:, 0].min(), Z2[:, 0].max(), 400)
     xline = None if abs(w2[1]) < 1e-12 else (beta_std - w2[0] * x1) / w2[1]
 
     # 5) Dispersión con etiquetas (acepta Series o ndarray)
     y_arr = np.asarray(y_labels)
-    maskM = (y_arr == "M")
+    maskM = y_arr == "M"
 
     plt.figure()
     plt.scatter(Z2[~maskM, 0], Z2[~maskM, 1], s=14, label="B")
-    plt.scatter(Z2[ maskM, 0], Z2[ maskM, 1], s=14, label="M")
+    plt.scatter(Z2[maskM, 0], Z2[maskM, 1], s=14, label="M")
     if xline is None:
         x0 = beta_std / (w2[0] if abs(w2[0]) > 1e-12 else 1.0)
         plt.axvline(x=x0, linestyle="--", label="Hiperplano (aprox)")
@@ -342,9 +337,9 @@ def calcular_hiperplano(outdir: str = "outputs_simplex"):
     # Solución del hiperplano
     m, n, p = sizes_prim
     beta = opt_prim[0] - opt_prim[1]
-    w = opt_prim[2: 2 + n] - opt_prim[2 + n: 2 + 2 * n]
-    y_sl = opt_prim[2 + 2 * n: 2 + 2 * n + m]  # <- antes 'y'
-    z_sl = opt_prim[2 + 2 * n + m: 2 + 2 * n + m + p]  # <- antes 'z'
+    w = opt_prim[2 : 2 + n] - opt_prim[2 + n : 2 + 2 * n]
+    y_sl = opt_prim[2 + 2 * n : 2 + 2 * n + m]  # <- antes 'y'
+    z_sl = opt_prim[2 + 2 * n + m : 2 + 2 * n + m + p]  # <- antes 'z'
 
     # 3) DUAL
     c_dual, M_dual, b_dual, bounds_dual, sizes_dual = construir_dual(A, B)
